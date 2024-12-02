@@ -1,5 +1,5 @@
 import dgram from "dgram"
-import { HeaderBuilder } from "./header.js";
+import { HeaderBuilder, Header } from "./header.js";
 import { Question } from "./question.js";
 import { Answer } from "./answer.js";
 // You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -11,13 +11,18 @@ udpSocket.bind(2053, "127.0.0.1");
 
 udpSocket.on("message", (buf, rinfo) => {
   try {
-    const response = Buffer.from("ok");
-    
+    const {header: requestHeader, len} = Header.fromBuffer(buf, 0)
+    console.log(requestHeader)
     
     const defaultHeader = new HeaderBuilder()
+      .setPacketIdentifier(requestHeader.packetIdentifier)
+      .setOperationCode(requestHeader.operationCode)
+      .setRecursionDesired(requestHeader.recursionDesired)
+      .setResponseCode(requestHeader.operationCode == 0 ? 0 : 4)
       .setQuestionCount(1)
       .setAnswerRecordCount(1)
       .build()
+    
     console.log(defaultHeader.toString())
     const headerBuffer = defaultHeader.toBuffer()
     console.log(headerBuffer)

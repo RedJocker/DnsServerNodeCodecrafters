@@ -88,6 +88,48 @@ class Header {
         buffer.writeUInt16BE(this.additionalRecordCount, 10)
         return buffer;
     }
+
+    /**
+    * Parse a buffer, starting at offset, into a Header instance.
+    * @param {Buffer} buffer - A buffer.
+    * @param {number} offset - Where to start reading buffer to create Header instance.
+    * @returns {{header: Header, len: number}} - An object containig key header with the header that was
+    *  parsed from buffer and len the size that was read, so that it can be added to offset if needed 
+    */
+    static fromBuffer(buffer, offset) {
+      
+      const packetIdentifier = buffer.readUInt16BE(offset)
+      const thirdByte = buffer.readUInt8(offset + 2)
+      const queryOrResponseIndicator = (thirdByte >> 7) & 0b00000001
+      const operationCode = (thirdByte >> 3) & 0b00001111;
+      const authoritativeAnswer = (thirdByte >> 2) & 0b00000001;
+      const truncation = (thirdByte >> 1) & 0b00000001;
+      const recursionDesired = (thirdByte) & 0b00000001;
+      const fourthByte = buffer.readUInt8(offset + 3)
+      const recursionAvailable = (fourthByte >> 7) & 0b00000001
+      const reserved = (fourthByte >> 4) & 0b00000111;
+      const responseCode = (fourthByte) & 0b00001111;
+      const questionCount = buffer.readUInt16BE(offset + 4)
+      const answerRecordCount = buffer.readUInt16BE(offset + 6)
+      const authorityRecordCount = buffer.readUInt16BE(offset + 8)
+      const additionalRecordCount = buffer.readUInt16BE(offset + 10)
+      const header = new Header(
+        packetIdentifier,
+        queryOrResponseIndicator,
+        operationCode,
+        authoritativeAnswer,
+        truncation,
+        recursionDesired,
+        recursionAvailable,
+        reserved,
+        responseCode,
+        questionCount,
+        answerRecordCount,
+        authorityRecordCount,
+        additionalRecordCount
+      )
+      return {header: header, len: 12}
+    }
 }
 
 class HeaderBuilder {
