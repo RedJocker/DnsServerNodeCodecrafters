@@ -1,6 +1,6 @@
 import dgram from "dgram"
 import { HeaderBuilder } from "./header.js";
-
+import { Question } from "./question.js";
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
 
@@ -12,12 +12,19 @@ udpSocket.on("message", (buf, rinfo) => {
   try {
     const response = Buffer.from("ok");
     
-    const defaultHeader = new HeaderBuilder().build()
+    
+    const defaultHeader = new HeaderBuilder()
+      .setQuestionCount(1)
+      .build()
     console.log(defaultHeader.toString())
     const headerBuffer = defaultHeader.toBuffer()
     console.log(headerBuffer)
-    
-    udpSocket.send(headerBuffer, rinfo.port, rinfo.address);
+    const question = new Question("codecrafters.io", 1)
+    const questionBuffer = question.toBuffer()
+    console.log(questionBuffer)
+    const bufferToSend = Buffer.concat([headerBuffer, questionBuffer], headerBuffer.length + questionBuffer.length)
+    console.log(bufferToSend)
+    udpSocket.send(bufferToSend, rinfo.port, rinfo.address);
   } catch (e) {
     console.log(`Error receiving data: ${e}`);
   }

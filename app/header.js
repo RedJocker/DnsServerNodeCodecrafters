@@ -81,7 +81,7 @@ class Header {
         const fourthByte = (this.recursionAvailable << 7) 
             + (this.reserved << 4)
             + (this.responseCode)
-        buffer.writeUInt8(fourthByte, 3 )
+        buffer.writeUInt8(fourthByte, 3)
         buffer.writeUInt16BE(this.questionCount, 4)
         buffer.writeUInt16BE(this.answerRecordCount, 6)
         buffer.writeUInt16BE(this.authorityRecordCount, 8)
@@ -181,6 +181,7 @@ class HeaderBuilder {
       this.authoritativeAnswer,
       this.truncation,
       this.recursionDesired,
+      this.recursionAvailable,
       this.reserved,
       this.responseCode,
       this.questionCount,
