@@ -1,6 +1,7 @@
 {
     "name": "@codecrafters/build-your-own-dns-server",
     "version": "1.0.0",
+    "type": "module",
     "description": "Build your own DNS-Server challenge, from CodeCrafters",
     "main": "main.js",
     "scripts": {
