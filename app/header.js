@@ -71,21 +71,21 @@ class Header {
 
     toBuffer() {
         const buffer = Buffer.alloc(12)
-        buffer.writeUInt16BE(this.packetIdentifier)
+        buffer.writeUInt16BE(this.packetIdentifier, 0)
         const thirdByte = (this.queryOrResponseIndicator << 7) 
             + (this.operationCode << 3)
             + (this.authoritativeAnswer << 2)
             + (this.truncation << 1)
             + (this.recursionDesired)
-        buffer.writeUInt8(thirdByte)
+        buffer.writeUInt8(thirdByte, 2)
         const fourthByte = (this.recursionAvailable << 7) 
             + (this.reserved << 4)
             + (this.responseCode)
-        buffer.writeUInt8(fourthByte)
-        buffer.writeUInt16BE(this.questionCount)
-        buffer.writeUInt16BE(this.answerRecordCount)
-        buffer.writeUInt16BE(this.authorityRecordCount)
-        buffer.writeUInt16BE(this.additionalRecordCount)
+        buffer.writeUInt8(fourthByte, 3)
+        buffer.writeUInt16BE(this.questionCount, 4)
+        buffer.writeUInt16BE(this.answerRecordCount, 6)
+        buffer.writeUInt16BE(this.authorityRecordCount, 8)
+        buffer.writeUInt16BE(this.additionalRecordCount, 10)
         return buffer;
     }
 }

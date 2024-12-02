@@ -13,7 +13,9 @@ udpSocket.on("message", (buf, rinfo) => {
     const response = Buffer.from("ok");
     
     const defaultHeader = new HeaderBuilder().build()
+    console.log(defaultHeader.toString())
     const headerBuffer = defaultHeader.toBuffer()
+    console.log(headerBuffer)
     
     udpSocket.send(headerBuffer, rinfo.port, rinfo.address);
   } catch (e) {
