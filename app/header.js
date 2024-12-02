@@ -81,7 +81,7 @@ class Header {
         const fourthByte = (this.recursionAvailable << 7) 
             + (this.reserved << 4)
             + (this.responseCode)
-        buffer.writeUInt8(fourthByte, 3)
+        buffer.writeUInt8(fourthByte, 3 )
         buffer.writeUInt16BE(this.questionCount, 4)
         buffer.writeUInt16BE(this.answerRecordCount, 6)
         buffer.writeUInt16BE(this.authorityRecordCount, 8)
@@ -93,7 +93,7 @@ class Header {
 class HeaderBuilder {
 
     constructor() {
-        this.packetIdentifier = 1024;
+        this.packetIdentifier = 1234;
         this.queryOrResponseIndicator = 1;
         this.operationCode = 0;
         this.authoritativeAnswer = 0;
