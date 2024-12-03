@@ -41,6 +41,8 @@ class Question {
         return buffer;
     }
 
+    static _isCompressedLabel = (maybeCompressedFlag) => maybeCompressedFlag == 0b1100_0000
+
     /**
     * Parse a buffer, starting at offset, into a Question instance.
     * @param {Buffer} buffer - A buffer.
@@ -49,18 +51,8 @@ class Question {
     *  parsed from buffer and len the size that was read, so that it can be added to offset if needed 
     */
     static fromBuffer(buffer, offset) {
-        let len = 0;
-        let size = buffer.readUInt8(offset++)
-        len += size + 1;
-        let labels = []
-        while (size > 0) {
-            const label = buffer.subarray(offset, offset + size).toString("ascii")
-            labels.push(label)
-            offset += size;
-            size = buffer.readUInt8(offset++)
-            len += size + 1
-        }
-        const name = labels.join('.')
+        let {name, len} = this._readName(buffer, offset);
+        offset += len
         const type = buffer.readInt16BE(offset)
         const questionClass = buffer.readInt16BE(offset + 2) 
         len += 4
@@ -68,11 +60,43 @@ class Question {
         return {question, len}
       }
 
+    /**
+    * Parse a buffer, starting at offset, into a name string.
+    * @param {Buffer} buffer - A buffer.
+    * @param {number} offset - Where to start reading buffer to create a name string.
+    * @returns {{name: string, len: number}} - An object containig key name with the name that was
+    *  parsed from buffer and len the size that was read, so that it can be added to offset if needed 
+    */
+      static _readName (buffer, offset) {
+        let len = 0;
+        let labels = []
+        while (true) {
+            let maybeCompressedFlag = buffer.readUInt8(offset) & 0b1100_0000
+            if (this._isCompressedLabel(maybeCompressedFlag)) {
+                const pointerOffset = buffer.readUInt16BE(offset) & 0b0011_1111_1111_1111
+                const { name: pointerName, len: pointerLen } = this._readName(buffer, pointerOffset)
+                const uncompressedName = labels.join('.') + "." + pointerName
+                const compressedLen = len + 2
+                return {name: uncompressedName, len: compressedLen}
+            }
+            let size = buffer.readUInt8(offset++)
+            len += size + 1;
+            if (size == 0) {
+                break ;
+            }
+            const label = buffer.subarray(offset, offset + size).toString("ascii")
+            labels.push(label)
+            offset += size;
+        }
+        const name = labels.join('.')
+        return {name, len}
+      }
+
       toAnswer = () => {
         return new Answer(this.name, this.type, this.domainToIp(this.name))
       }
 
-      domainToIp = (name) => "8.8.8.8"
+      domainToIp = (name) => "8.8.8.8"   
       
 }
 

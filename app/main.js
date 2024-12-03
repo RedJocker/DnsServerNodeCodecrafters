@@ -22,7 +22,7 @@ udpSocket.on("message", (buf, rinfo) => {
       questions.push(question)
       offset += len;
     }
-    questions.forEach(q => console.log(`answer: ${q.toString()}`))
+    questions.forEach(q => console.log(`question: ${q.toString()}`))
     
     const answers = questions.map(q => q.toAnswer())
     
