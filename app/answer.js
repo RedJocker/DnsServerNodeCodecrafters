@@ -18,7 +18,12 @@ class Answer {
         this.ip = ip
     }
 
-    toBuffer() {
+    // Method to represent the object as a string
+    toString = () => {
+        return JSON.stringify(this, null, 2);
+    }
+
+    toBuffer = () => {
         const labels = this.name.split(".").map(l => {
             return {
                 len: l.length, 

@@ -2,6 +2,7 @@ import dgram from "dgram"
 import { HeaderBuilder, Header } from "./header.js";
 import { Question } from "./question.js";
 import { Answer } from "./answer.js";
+
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
 
@@ -11,28 +12,37 @@ udpSocket.bind(2053, "127.0.0.1");
 
 udpSocket.on("message", (buf, rinfo) => {
   try {
-    const {header: requestHeader, len} = Header.fromBuffer(buf, 0)
-    console.log(requestHeader)
+    const {header: requestHeader, len: headerOffset} = Header.fromBuffer(buf, 0)
+    console.log(`requestHeader: ${requestHeader}`)
     
-    const defaultHeader = new HeaderBuilder()
+    let offset = headerOffset
+    const questions = []
+    for (let i = 0; i < requestHeader.questionCount; i++) {
+      const {question, len} = Question.fromBuffer(buf, offset)
+      questions.push(question)
+      offset += len;
+    }
+    questions.forEach(q => console.log(`answer: ${q.toString()}`))
+    
+    const answers = questions.map(q => q.toAnswer())
+    
+    const responseHeader = new HeaderBuilder()
       .setPacketIdentifier(requestHeader.packetIdentifier)
       .setOperationCode(requestHeader.operationCode)
       .setRecursionDesired(requestHeader.recursionDesired)
       .setResponseCode(requestHeader.operationCode == 0 ? 0 : 4)
-      .setQuestionCount(1)
-      .setAnswerRecordCount(1)
+      .setQuestionCount(questions.length)
+      .setAnswerRecordCount(answers.length)
       .build()
     
-    console.log(defaultHeader.toString())
-    const headerBuffer = defaultHeader.toBuffer()
+    console.log(`responseHeader: ${responseHeader.toString()}`)
+    const headerBuffer = responseHeader.toBuffer()
     console.log(headerBuffer)
-    const question = new Question("codecrafters.io", 1)
-    const questionBuffer = question.toBuffer()
-    console.log(questionBuffer)
-    const answer = new Answer("codecrafters.io", 1, "8.8.8.8")
-    const answerBuffer = answer.toBuffer();
-    console.log(answerBuffer)
-    const bufferToSend = Buffer.concat([headerBuffer, questionBuffer, answerBuffer], headerBuffer.length + questionBuffer.length + answerBuffer.length)
+    
+    answers.forEach(a => console.log(`answer: ${a.toString()}`))
+    const buffersToSend = [headerBuffer, ...(questions.map(q => q.toBuffer())), ...(answers.map(a => a.toBuffer()))]
+    const totalLen = buffersToSend.reduce((a,c) => a + c.length, 0)
+    const bufferToSend = Buffer.concat(buffersToSend, totalLen)
     console.log(bufferToSend)
     udpSocket.send(bufferToSend, rinfo.port, rinfo.address);
   } catch (e) {

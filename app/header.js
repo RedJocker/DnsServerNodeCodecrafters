@@ -46,12 +46,12 @@ class Header {
     }
   
     // Method to represent the object as a string
-    toString() {
+    toString = () => {
       return JSON.stringify(this, null, 2);
     }
   
     // Static method to create a Header from a plain object
-    static fromObject(obj) {
+    static fromObject = (obj) => {
       return new Header(
         obj.packetIdentifier,
         obj.queryOrResponseIndicator,
@@ -69,7 +69,7 @@ class Header {
       );
     }
 
-    toBuffer() {
+    toBuffer = () => {
         const buffer = Buffer.alloc(12)
         buffer.writeUInt16BE(this.packetIdentifier, 0)
         const thirdByte = (this.queryOrResponseIndicator << 7) 
@@ -96,7 +96,7 @@ class Header {
     * @returns {{header: Header, len: number}} - An object containig key header with the header that was
     *  parsed from buffer and len the size that was read, so that it can be added to offset if needed 
     */
-    static fromBuffer(buffer, offset) {
+    static fromBuffer = (buffer, offset) => {
       
       const packetIdentifier = buffer.readUInt16BE(offset)
       const thirdByte = buffer.readUInt8(offset + 2)
@@ -215,7 +215,7 @@ class HeaderBuilder {
     return this;
   }
 
-  build() {
+  build = () => {
     return new Header(
       this.packetIdentifier,
       this.queryOrResponseIndicator,
