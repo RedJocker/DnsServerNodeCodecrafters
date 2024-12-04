@@ -1,3 +1,5 @@
+import { Question } from "./question.js";
+
 class Answer {
     /**
     * Creates a Answer instance.
@@ -51,6 +53,32 @@ class Answer {
         }
         return buffer;
     }
+
+    /**
+    * Parse a buffer, starting at offset, into a Answer instance.
+    * @param {Buffer} buffer - A buffer.
+    * @param {number} offset - Where to start reading buffer to create Answer instance.
+    * @returns {{answer: Answer, len: number}} - An object containig key answer with the answer that was
+    *  parsed from buffer and len the size that was read, so that it can be added to offset if needed 
+    */
+    static fromBuffer(buffer, offset) {
+        let {name, len} = Question._readName(buffer, offset);
+        offset += len
+        const type = buffer.readUInt16BE(offset)
+        const answerClass = buffer.readUInt16BE(offset + 2) 
+        const timeToLive = buffer.readUInt32BE(offset + 4)
+        const dataLength = buffer.readUInt16BE(offset + 8)
+        offset += 10
+
+        const ipOctets = []
+        for (let i = 0; i < 4; i++) {
+            ipOctets.push(buffer.readUInt8(offset))
+            offset++;
+        }
+        const ip = ipOctets.join('.')
+        const answer = new Answer(name, type, ip)
+        return {answer, len: len + 14}
+      }
 }
 
 

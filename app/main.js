@@ -2,61 +2,160 @@ import dgram from "dgram"
 import { HeaderBuilder, Header } from "./header.js";
 import { Question } from "./question.js";
 import { Answer } from "./answer.js";
+import { EventEmitter } from 'node:events';
+
+const customEventsEmmitter = new EventEmitter();
+let customPacketIdentifier = 0;
 
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
 
-// Uncomment this block to pass the first stage
-const udpSocket = dgram.createSocket("udp4");
-udpSocket.bind(2053, "127.0.0.1");
 
-udpSocket.on("message", (buf, rinfo) => {
+const servingSocket = dgram.createSocket("udp4");
+servingSocket.bind(2053, "127.0.0.1");
+
+const resolverSocket = dgram.createSocket("udp4");
+const [ipResolver, portStrResolver] = process.argv[3].split(':', 2)
+const portResolver = parseInt(portStrResolver)
+resolverSocket.connect(portResolver, ipResolver);
+
+servingSocket.on("message", (buf, rinfo) => {
   try {
     const {header: requestHeader, len: headerOffset} = Header.fromBuffer(buf, 0)
-    console.log(`requestHeader: ${requestHeader}`)
+    console.log(`requestHeaderClient: ${requestHeader}`)
     
     let offset = headerOffset
-    const questions = []
+    const requestQuestions = []
     for (let i = 0; i < requestHeader.questionCount; i++) {
       const {question, len} = Question.fromBuffer(buf, offset)
-      questions.push(question)
+      requestQuestions.push(question)
       offset += len;
     }
-    questions.forEach(q => console.log(`question: ${q.toString()}`))
-    
-    const answers = questions.map(q => q.toAnswer())
-    
-    const responseHeader = new HeaderBuilder()
-      .setPacketIdentifier(requestHeader.packetIdentifier)
-      .setOperationCode(requestHeader.operationCode)
-      .setRecursionDesired(requestHeader.recursionDesired)
-      .setResponseCode(requestHeader.operationCode == 0 ? 0 : 4)
-      .setQuestionCount(questions.length)
-      .setAnswerRecordCount(answers.length)
-      .build()
-    
-    console.log(`responseHeader: ${responseHeader.toString()}`)
-    const headerBuffer = responseHeader.toBuffer()
-    console.log(headerBuffer)
-    
-    answers.forEach(a => console.log(`answer: ${a.toString()}`))
-    const buffersToSend = [headerBuffer, ...(questions.map(q => q.toBuffer())), ...(answers.map(a => a.toBuffer()))]
-    const totalLen = buffersToSend.reduce((a,c) => a + c.length, 0)
-    const bufferToSend = Buffer.concat(buffersToSend, totalLen)
-    console.log(bufferToSend)
-    udpSocket.send(bufferToSend, rinfo.port, rinfo.address);
+    requestQuestions.forEach(q => console.log(`question: ${q.toString()}`))
+    customEventsEmmitter.emit('forward', rinfo, requestHeader, requestQuestions)
   } catch (e) {
-    console.log(`Error receiving data: ${e}`);
+    console.log(`Error receiving data from client: ${e}`);
   }
 });
 
-udpSocket.on("error", (err) => {
+const isUnsupportedOperation = (header) => header.operationCode != 0
+
+const respondUnsupportedOperation = (requestHeader, rinfo) => {
+  const responseHeader = new HeaderBuilder()
+        .setPacketIdentifier(requestHeader.packetIdentifier)
+        .setQueryOrResponseIndicator(1)
+        .setOperationCode(requestHeader.operationCode)
+        .setQuestionCount(0)
+        .setAnswerRecordCount(0)
+        .setRecursionDesired(requestHeader.recursionDesired)
+        .setPacketIdentifier(requestHeader.packetIdentifier)
+        .setResponseCode(4)
+        .build();
+  console.log(`responseHeader opcode!=0: ${responseHeader.toString()}`)
+  const buffersToResponse = responseHeader.toBuffer()
+  console.log(buffersToResponse)
+  servingSocket.send(buffersToResponse, rinfo.port, rinfo.address);
+}
+
+const respondAllQuestions = (requestHeader, requestQuestions, responseAnswers, rinfo) => {
+  const responseHeader = new HeaderBuilder()
+          .setPacketIdentifier(requestHeader.packetIdentifier)
+          .setQueryOrResponseIndicator(1)
+          .setRecursionDesired(requestHeader.recursionDesired)
+          .setOperationCode(requestHeader.operationCode)
+          .setQuestionCount(requestHeader.questionCount)
+          .setAnswerRecordCount(requestHeader.questionCount)
+          .setPacketIdentifier(requestHeader.packetIdentifier)
+          .build();
+  console.log(`responseHeaderClient: ${responseHeader}`)
+  const responseHeaderBuffer = responseHeader.toBuffer()
+  console.log(responseHeaderBuffer)
+  const questionBufferArr = requestQuestions.map(q => q.toBuffer())
+  
+  const answerBufferArr = responseAnswers.map(a => a.toBuffer())
+  const buffersToResponse = [responseHeaderBuffer, ...questionBufferArr, ...answerBufferArr]
+  const totalLen = buffersToResponse.reduce((a,c) => a + c.length, 0)
+  const bufferToResponse = Buffer.concat(buffersToResponse, totalLen)
+  console.log(bufferToResponse)
+  servingSocket.send(bufferToResponse, rinfo.port, rinfo.address)
+}
+
+customEventsEmmitter.on('forward', (rinfo, requestHeader, requestQuestions) => {
+
+  if (isUnsupportedOperation(requestHeader)) {
+    respondUnsupportedOperation(requestHeader, rinfo)
+    return ;
+  }
+  
+  const answers = []
+  requestQuestions.forEach((question, i) => {
+    const forwardHeader = new HeaderBuilder()
+      .setQueryOrResponseIndicator(0)
+      .setQuestionCount(1)
+      .setPacketIdentifier(customPacketIdentifier++)
+      .build();
+    console.log(`forwardHeader: ${forwardHeader.toString()}`)
+    const headerBuffer = forwardHeader.toBuffer()
+    console.log(headerBuffer)
+    console.log(`question-${i}: ${question.toString()}`)
+    const questionBuffer = question.toBuffer();
+    console.log(questionBuffer)
+    const buffersToForward = [headerBuffer, questionBuffer]
+    const totalLen = buffersToForward.reduce((a,c) => a + c.length, 0)
+    const bufferToForward = Buffer.concat(buffersToForward, totalLen)
+    
+    const receivedPacketWithId = `received-${forwardHeader.packetIdentifier}`
+    customEventsEmmitter.on(receivedPacketWithId, (answer) => {
+      answers.push(answer)
+      if (answers.length >= requestHeader.questionCount) {
+        customEventsEmmitter.removeAllListeners(receivedPacketWithId)
+        respondAllQuestions(requestHeader, requestQuestions, answers, rinfo)
+      }
+    })
+
+    console.log(bufferToForward)
+    resolverSocket.send(bufferToForward);
+  })
+})
+
+resolverSocket.on("message", (buf, rinfo) => {
+  try {
+    const {header: responseHeader, len: headerOffset} = Header.fromBuffer(buf, 0)
+    console.log(`responseHeaderResolver: ${responseHeader}`)
+    const headerBuffer = responseHeader.toBuffer()
+    console.log(headerBuffer)
+    let offset = headerOffset
+    
+    const {question, len: lenQuestion} = Question.fromBuffer(buf, offset)
+    offset += lenQuestion;
+    
+    console.log(`question: ${question.toString()}`)
+    const {answer, len1: lenAnswer} = Answer.fromBuffer(buf, offset)  
+    offset += lenAnswer;
+    console.log(`answer: ${answer.toString()}`)
+    const receivedPacketWithId = `received-${responseHeader.packetIdentifier}`
+    customEventsEmmitter.emit(receivedPacketWithId, answer)
+  } catch (e) {
+    console.log(`Error receiving data from resolver: ${e}`);
+  }
+});
+
+servingSocket.on("error", (err) => {
   console.log(`Error: ${err}`);
 });
 
-udpSocket.on("listening", () => {
-  const address = udpSocket.address();
+servingSocket.on("listening", () => {
+  const address = servingSocket.address();
   console.log(`Server listening ${address.address}:${address.port}`);
+});
+
+resolverSocket.on("error", (err) => {
+  console.log(`Resolver error: ${err}`);
+});
+
+resolverSocket.on("connect", () => {
+  const address = resolverSocket.address();
+  console.log(`Resolver connected ${address.address}:${address.port}`);
 });
 
 
